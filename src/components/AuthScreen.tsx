@@ -21,6 +21,14 @@ const avatarColors = [
   "#0891b2", // Cyan
 ];
 
+async function hashPassword(password: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hashHex;
+}
+
 export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
@@ -76,78 +84,83 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
     setLoading(true);
 
-    // Simulate network delay for premium visual feedback
-    setTimeout(() => {
-      const users = getRegisteredUsers();
+    hashPassword(password).then((hashedPassword) => {
+      // Simulate network delay for premium visual feedback
+      setTimeout(() => {
+        const users = getRegisteredUsers();
 
-      if (isRegister) {
-        if (!cleanName) {
-          setError("Name is required.");
-          setLoading(false);
-          return;
-        }
-
-        const userExists = users.some((u) => u.email === cleanEmail);
-        if (userExists) {
-          setError("An account with this email already exists.");
-          setLoading(false);
-          return;
-        }
-
-        // Create new user profile
-        const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
-        const initials = getInitials(cleanName);
-        const newUser: RegisteredUser = {
-          email: cleanEmail,
-          name: cleanName,
-          avatar: initials,
-          color: randomColor,
-          passwordHash: password, // simple simulated hashing
-        };
-
-        users.push(newUser);
-        saveRegisteredUsers(users);
-
-        const publicUser: User = {
-          email: newUser.email,
-          name: newUser.name,
-          avatar: newUser.avatar,
-          color: newUser.color,
-        };
-        setLoading(false);
-        onLogin(publicUser);
-      } else {
-        // Sign In Flow
-        const foundUser = users.find((u) => u.email === cleanEmail && u.passwordHash === password);
-        if (!foundUser) {
-          // Provide default demo admin user for easy access/evaluation
-          if (cleanEmail === "admin@taskflow.com" && password === "password") {
-            const adminUser: User = {
-              email: "admin@taskflow.com",
-              name: "Demo Admin",
-              avatar: "DA",
-              color: "#4f46e5",
-            };
+        if (isRegister) {
+          if (!cleanName) {
+            setError("Name is required.");
             setLoading(false);
-            onLogin(adminUser);
             return;
           }
 
-          setError("Invalid email or password.");
-          setLoading(false);
-          return;
-        }
+          const userExists = users.some((u) => u.email === cleanEmail);
+          if (userExists) {
+            setError("An account with this email already exists.");
+            setLoading(false);
+            return;
+          }
 
-        const publicUser: User = {
-          email: foundUser.email,
-          name: foundUser.name,
-          avatar: foundUser.avatar,
-          color: foundUser.color,
-        };
-        setLoading(false);
-        onLogin(publicUser);
-      }
-    }, 800);
+          // Create new user profile
+          const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
+          const initials = getInitials(cleanName);
+          const newUser: RegisteredUser = {
+            email: cleanEmail,
+            name: cleanName,
+            avatar: initials,
+            color: randomColor,
+            passwordHash: hashedPassword,
+          };
+
+          users.push(newUser);
+          saveRegisteredUsers(users);
+
+          const publicUser: User = {
+            email: newUser.email,
+            name: newUser.name,
+            avatar: newUser.avatar,
+            color: newUser.color,
+          };
+          setLoading(false);
+          onLogin(publicUser);
+        } else {
+          // Sign In Flow
+          const foundUser = users.find((u) => u.email === cleanEmail && u.passwordHash === hashedPassword);
+          if (!foundUser) {
+            // Provide default demo admin user for easy access/evaluation
+            if (cleanEmail === "admin@taskflow.com" && password === "password") {
+              const adminUser: User = {
+                email: "admin@taskflow.com",
+                name: "Demo Admin",
+                avatar: "DA",
+                color: "#4f46e5",
+              };
+              setLoading(false);
+              onLogin(adminUser);
+              return;
+            }
+
+            setError("Invalid email or password.");
+            setLoading(false);
+            return;
+          }
+
+          const publicUser: User = {
+            email: foundUser.email,
+            name: foundUser.name,
+            avatar: foundUser.avatar,
+            color: foundUser.color,
+          };
+          setLoading(false);
+          onLogin(publicUser);
+        }
+      }, 800);
+    }).catch(() => {
+      setError("An error occurred during authentication.");
+      setLoading(false);
+    });
   }
 
   return (

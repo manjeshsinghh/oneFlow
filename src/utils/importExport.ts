@@ -202,7 +202,11 @@ function parseCsv(csv: string) {
 }
 
 function csvEscape(value: string) {
-  return `"${value.replace(/"/g, '""')}"`;
+  let escaped = value.replace(/"/g, '""');
+  if (value.startsWith("=") || value.startsWith("+") || value.startsWith("-") || value.startsWith("@") || value.startsWith("\t") || value.startsWith("\r")) {
+    escaped = "'" + escaped;
+  }
+  return `"${escaped}"`;
 }
 
 function initials(name: string) {
