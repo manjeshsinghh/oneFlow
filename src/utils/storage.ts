@@ -17,6 +17,7 @@ export function loadBoardState(): BoardState {
       projects: Array.isArray(parsed.projects) ? parsed.projects : sampleProjects,
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks : sampleTasks,
       theme: parsed.theme === "dark" || parsed.theme === "light" ? parsed.theme : fallbackTheme,
+      user: parsed.user,
     };
   } catch {
     return { projects: sampleProjects, tasks: sampleTasks, theme: fallbackTheme };

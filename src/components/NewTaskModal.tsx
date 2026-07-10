@@ -1,15 +1,16 @@
 import { FormEvent, useState } from "react";
 import { X } from "lucide-react";
-import { Priority, Task, Project } from "../types";
+import { Priority, Task, Project, User } from "../types";
 
 type NewTaskModalProps = {
   onClose: () => void;
   onCreate: (task: Task) => void;
   projects: Project[];
   activeProjectId: string | "all";
+  currentUser?: User;
 };
 
-export function NewTaskModal({ onClose, onCreate, projects, activeProjectId }: NewTaskModalProps) {
+export function NewTaskModal({ onClose, onCreate, projects, activeProjectId, currentUser }: NewTaskModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   
@@ -56,7 +57,9 @@ export function NewTaskModal({ onClose, onCreate, projects, activeProjectId }: N
           name: label,
           color: ["#38bdf8", "#a855f7", "#22c55e", "#f97316"][index % 4],
         })),
-      assignees: [{ name: "You", avatar: "YO", color: "#334155" }],
+      assignees: currentUser
+        ? [{ name: currentUser.name, avatar: currentUser.avatar, color: currentUser.color }]
+        : [{ name: "You", avatar: "YO", color: "#334155" }],
       comments: 0,
       createdAt: new Date().toISOString(),
     });

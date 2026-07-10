@@ -19,6 +19,7 @@ import { NewColumnModal } from "./components/NewColumnModal";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { EditProjectModal } from "./components/EditProjectModal";
 import { EditColumnModal } from "./components/EditColumnModal";
+import { AuthScreen } from "./components/AuthScreen";
 import { TaskCard } from "./components/TaskCard";
 import { TaskListView } from "./components/TaskListView";
 import { CalendarView } from "./components/CalendarView";
@@ -26,7 +27,7 @@ import { InsightsView } from "./components/InsightsView";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Toast, ToastKind } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
-import { ColumnId, Priority, Task, Project, Column } from "./types";
+import { ColumnId, Priority, Task, Project, Column, User } from "./types";
 import { exportCsv, exportJson, readImportFile } from "./utils/importExport";
 import { loadBoardState, resetBoardState, saveBoardState } from "./utils/storage";
 
@@ -40,6 +41,9 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>(initialState.projects);
   const [tasks, setTasks] = useState<Task[]>(initialState.tasks);
   const [theme, setTheme] = useState<"light" | "dark">(initialState.theme);
+  const [user, setUser] = useState<User | undefined>(initialState.user);
+  const [isProfileOpen, setProfileOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   
   const [activeProjectId, setActiveProjectId] = useState<string | "all">("all");
   const [view, setView] = useState<"board" | "list" | "calendar" | "insights">("board");
@@ -65,8 +69,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    saveBoardState({ projects, tasks, theme });
-  }, [projects, tasks, theme]);
+    saveBoardState({ projects, tasks, theme, user });
+  }, [projects, tasks, theme, user]);
 
   useEffect(() => {
     if (!toast) {
@@ -76,7 +80,19 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(null), 2400);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    if (isProfileOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isProfileOpen]);
   // Unique labels list across all tasks
   const labels = useMemo(
     () => Array.from(new Set(tasks.flatMap((task) => task.labels.map((item) => item.name)))).sort(),
@@ -375,6 +391,20 @@ export default function App() {
     }
   }, [activeProjectId, projects]);
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <AuthScreen
+          onLogin={(loggedInUser) => {
+            setUser(loggedInUser);
+            notify(`Logged in as ${loggedInUser.name}`);
+          }}
+        />
+        {toast && <Toast message={toast.message} kind={toast.kind} />}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
@@ -479,7 +509,41 @@ export default function App() {
             </div>
             
             <ThemeToggle theme={theme} onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} />
-            <button type="button" className="primary-button h-10" onClick={() => setModalOpen(true)}>
+            
+            {user && (
+              <div className="relative" ref={profileDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(!isProfileOpen)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 text-xs font-bold text-white shadow-sm transition hover:scale-105 shrink-0"
+                  style={{ backgroundColor: user.color }}
+                  title={`${user.name} (${user.email})`}
+                >
+                  {user.avatar}
+                </button>
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 z-40 w-48 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-950">
+                    <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{user.name}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUser(undefined);
+                        setProfileOpen(false);
+                        notify("Logged out", "info");
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button type="button" className="primary-button h-10 shrink-0" onClick={() => setModalOpen(true)}>
               <Plus className="h-4 w-4" />
               New Task
             </button>
@@ -592,6 +656,7 @@ export default function App() {
           onCreate={handleCreate}
           projects={projects}
           activeProjectId={activeProjectId}
+          currentUser={user}
         />
       )}
       

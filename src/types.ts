@@ -40,8 +40,16 @@ export type Project = {
   columns: Column[];
 };
 
+export type User = {
+  email: string;
+  name: string;
+  avatar: string;
+  color: string;
+};
+
 export type BoardState = {
   projects: Project[];
   tasks: Task[];
   theme: "light" | "dark";
+  user?: User;
 };
