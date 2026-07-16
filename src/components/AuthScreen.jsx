@@ -1,16 +1,7 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Lock, Mail, User as UserIcon } from "lucide-react";
-import { User } from "../types";
+import { api } from "../utils/api";
 
-type AuthScreenProps = {
-  onLogin: (user: User) => void;
-};
-
-type RegisteredUser = User & {
-  passwordHash: string; // Storing password locally for authentication simulation
-};
-
-const USERS_STORAGE_KEY = "taskflow-registered-users";
 const avatarColors = [
   "#2563eb", // Blue
   "#059669", // Emerald
@@ -21,7 +12,7 @@ const avatarColors = [
   "#0891b2", // Cyan
 ];
 
-async function hashPassword(password: string): Promise<string> {
+async function hashPassword(password) {
   const msgBuffer = new TextEncoder().encode(password);
   const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -29,7 +20,7 @@ async function hashPassword(password: string): Promise<string> {
   return hashHex;
 }
 
-export function AuthScreen({ onLogin }: AuthScreenProps) {
+export function AuthScreen({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -38,20 +29,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function getRegisteredUsers(): RegisteredUser[] {
-    try {
-      const raw = localStorage.getItem(USERS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveRegisteredUsers(users: RegisteredUser[]) {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-  }
-
-  function getInitials(fullName: string): string {
+  function getInitials(fullName) {
     return fullName
       .split(" ")
       .map((part) => part[0])
@@ -60,7 +38,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
       .toUpperCase() || "US";
   }
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event) {
     event.preventDefault();
     setError("");
 
@@ -84,83 +62,39 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
     setLoading(true);
 
-    hashPassword(password).then((hashedPassword) => {
-      // Simulate network delay for premium visual feedback
-      setTimeout(() => {
-        const users = getRegisteredUsers();
-
-        if (isRegister) {
-          if (!cleanName) {
-            setError("Name is required.");
-            setLoading(false);
-            return;
-          }
-
-          const userExists = users.some((u) => u.email === cleanEmail);
-          if (userExists) {
-            setError("An account with this email already exists.");
-            setLoading(false);
-            return;
-          }
-
-          // Create new user profile
-          const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
-          const initials = getInitials(cleanName);
-          const newUser: RegisteredUser = {
-            email: cleanEmail,
-            name: cleanName,
-            avatar: initials,
-            color: randomColor,
-            passwordHash: hashedPassword,
-          };
-
-          users.push(newUser);
-          saveRegisteredUsers(users);
-
-          const publicUser: User = {
-            email: newUser.email,
-            name: newUser.name,
-            avatar: newUser.avatar,
-            color: newUser.color,
-          };
-          setLoading(false);
-          onLogin(publicUser);
-        } else {
-          // Sign In Flow
-          const foundUser = users.find((u) => u.email === cleanEmail && u.passwordHash === hashedPassword);
-          if (!foundUser) {
-            // Provide default demo admin user for easy access/evaluation
-            if (cleanEmail === "admin@taskflow.com" && password === "password") {
-              const adminUser: User = {
-                email: "admin@taskflow.com",
-                name: "Demo Admin",
-                avatar: "DA",
-                color: "#4f46e5",
-              };
+    hashPassword(password)
+      .then(async (hashedPassword) => {
+        try {
+          let loggedInUser;
+          if (isRegister) {
+            if (!cleanName) {
+              setError("Name is required.");
               setLoading(false);
-              onLogin(adminUser);
               return;
             }
-
-            setError("Invalid email or password.");
-            setLoading(false);
-            return;
+            const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
+            const initials = getInitials(cleanName);
+            loggedInUser = await api.register(
+              cleanEmail,
+              hashedPassword,
+              cleanName,
+              initials,
+              randomColor
+            );
+          } else {
+            loggedInUser = await api.login(cleanEmail, hashedPassword);
           }
-
-          const publicUser: User = {
-            email: foundUser.email,
-            name: foundUser.name,
-            avatar: foundUser.avatar,
-            color: foundUser.color,
-          };
           setLoading(false);
-          onLogin(publicUser);
+          onLogin(loggedInUser);
+        } catch (err) {
+          setError(err.message || "Authentication failed.");
+          setLoading(false);
         }
-      }, 800);
-    }).catch(() => {
-      setError("An error occurred during authentication.");
-      setLoading(false);
-    });
+      })
+      .catch(() => {
+        setError("An error occurred during authentication.");
+        setLoading(false);
+      });
   }
 
   return (
@@ -179,7 +113,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             {isRegister
-              ? "Create your local account to start tracking tasks"
+              ? "Create your account to start tracking tasks"
               : "Sign in to manage your workspace projects"}
           </p>
         </div>
@@ -268,7 +202,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
           {/* Demo Hint */}
           {!isRegister && (
             <div className="rounded-lg bg-slate-50 p-2.5 text-[11px] text-slate-500 border border-slate-100 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400">
-              💡 Register a new account locally, or sign in using demo account:
+              💡 Register a new account, or sign in using demo account:
               <br />
               <strong>Email:</strong> admin@taskflow.com | <strong>Pass:</strong> password
             </div>

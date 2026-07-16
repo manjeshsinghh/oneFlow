@@ -1,12 +1,5 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
-import { Column } from "../types";
-
-type NewColumnModalProps = {
-  onClose: () => void;
-  onCreate: (column: Column) => void;
-  existingColumns: Column[];
-};
 
 const presetColors = [
   "#64748b", // Slate
@@ -21,12 +14,12 @@ const presetColors = [
   "#d946ef", // Magenta
 ];
 
-export function NewColumnModal({ onClose, onCreate, existingColumns }: NewColumnModalProps) {
+export function NewColumnModal({ onClose, onCreate, existingColumns }) {
   const [title, setTitle] = useState("");
   const [accent, setAccent] = useState(presetColors[6]); // default to Blue
   const [error, setError] = useState("");
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event) {
     event.preventDefault();
     const cleanTitle = title.trim();
     if (!cleanTitle) {

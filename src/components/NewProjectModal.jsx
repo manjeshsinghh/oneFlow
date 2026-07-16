@@ -1,19 +1,12 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
-import { Project } from "../types";
 
-type NewProjectModalProps = {
-  onClose: () => void;
-  onCreate: (project: Project) => void;
-  existingProjects: Project[];
-};
-
-export function NewProjectModal({ onClose, onCreate, existingProjects }: NewProjectModalProps) {
+export function NewProjectModal({ onClose, onCreate, existingProjects }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event) {
     event.preventDefault();
     const cleanName = name.trim();
     if (!cleanName) {

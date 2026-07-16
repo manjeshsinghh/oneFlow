@@ -1,13 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { CalendarDays, ChevronDown, MessageSquare, Trash2 } from "lucide-react";
-import { Task, ColumnId, Project, Column } from "../types";
-
-type TaskListViewProps = {
-  tasks: Task[];
-  projects: Project[];
-  onStatusChange: (id: string, status: ColumnId) => void;
-  onDelete: (id: string) => void;
-};
 
 const priorityClasses = {
   High: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30",
@@ -15,7 +7,7 @@ const priorityClasses = {
   Low: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
 };
 
-export function TaskListView({ tasks, projects, onStatusChange, onDelete }: TaskListViewProps) {
+export function TaskListView({ tasks, projects, onStatusChange, onDelete }) {
   if (!tasks.length) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900/40">
@@ -25,7 +17,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
   }
 
   // Find project name for display
-  function getProjectName(projId: string): string {
+  function getProjectName(projId) {
     return projects.find((p) => p.id === projId)?.name || "Unknown Project";
   }
 
@@ -58,7 +50,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
                   {/* Title & Description */}
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1 pr-4">
-                      <h3 className="font-semibold text-slate-950 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                       <h3 className="font-semibold text-slate-950 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {task.title}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
@@ -85,7 +77,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
 
                   {/* Priority */}
                   <td className="px-6 py-4">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${priorityClasses[task.priority]}`}>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${priorityClasses[task.priority] || ""}`}>
                       {task.priority}
                     </span>
                   </td>
@@ -93,7 +85,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
                   {/* Labels */}
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {task.labels.map((label) => (
+                      {task.labels && task.labels.map((label) => (
                         <span
                           key={label.name}
                           className="rounded px-1.5 py-0.5 text-[10px] font-medium text-slate-950 dark:text-white"
@@ -102,7 +94,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
                           {label.name}
                         </span>
                       ))}
-                      {!task.labels.length && (
+                      {(!task.labels || !task.labels.length) && (
                         <span className="text-xs text-slate-400 dark:text-slate-600">-</span>
                       )}
                     </div>
@@ -111,7 +103,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
                   {/* Assignees */}
                   <td className="px-6 py-4">
                     <div className="flex -space-x-1.5 overflow-hidden">
-                      {task.assignees.map((assignee) => (
+                      {task.assignees && task.assignees.map((assignee) => (
                         <span
                           key={assignee.name}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white dark:border-slate-900"
@@ -121,7 +113,7 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
                           {assignee.avatar}
                         </span>
                       ))}
-                      {!task.assignees.length && (
+                      {(!task.assignees || !task.assignees.length) && (
                         <span className="text-xs text-slate-400 dark:text-slate-600">-</span>
                       )}
                     </div>
@@ -164,7 +156,8 @@ export function TaskListView({ tasks, projects, onStatusChange, onDelete }: Task
   );
 }
 
-function formatDate(date: string) {
+function formatDate(date) {
+  if (!date) return "";
   try {
     return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T00:00:00`));
   } catch {
@@ -172,19 +165,13 @@ function formatDate(date: string) {
   }
 }
 
-type StatusDropdownProps = {
-  currentStatus: ColumnId;
-  columns: Column[];
-  onChange: (status: ColumnId) => void;
-};
-
-function StatusDropdown({ currentStatus, columns, onChange }: StatusDropdownProps) {
+function StatusDropdown({ currentStatus, columns, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     }
@@ -197,7 +184,7 @@ function StatusDropdown({ currentStatus, columns, onChange }: StatusDropdownProp
     };
   }, [isOpen]);
 
-  const currentColumn = columns.find((col) => col.id === currentStatus) || columns[0];
+  const currentColumn = (columns && columns.find((col) => col.id === currentStatus)) || (columns && columns[0]);
   if (!currentColumn) {
     return null;
   }
@@ -216,7 +203,7 @@ function StatusDropdown({ currentStatus, columns, onChange }: StatusDropdownProp
 
       {isOpen && (
         <div className="absolute left-0 mt-1 z-30 w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-md outline-none dark:border-slate-800 dark:bg-slate-950">
-          {columns.map((column) => (
+          {columns && columns.map((column) => (
             <button
               key={column.id}
               type="button"

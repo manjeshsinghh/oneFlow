@@ -1,18 +1,16 @@
 import {
   DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  DragOverlay,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
 import { BarChart3, Calendar, LayoutGrid, List, Plus, Settings } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BoardColumn } from "./components/BoardColumn";
 import { NewTaskModal } from "./components/NewTaskModal";
 import { NewColumnModal } from "./components/NewColumnModal";
@@ -25,41 +23,36 @@ import { TaskListView } from "./components/TaskListView";
 import { CalendarView } from "./components/CalendarView";
 import { InsightsView } from "./components/InsightsView";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { Toast, ToastKind } from "./components/Toast";
+import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
-import { ColumnId, Priority, Task, Project, Column, User } from "./types";
 import { exportCsv, exportJson, readImportFile } from "./utils/importExport";
 import { loadBoardState, resetBoardState, saveBoardState } from "./utils/storage";
-
-type ToastState = {
-  message: string;
-  kind: ToastKind;
-};
+import { api } from "./utils/api";
 
 export default function App() {
   const initialState = useMemo(() => loadBoardState(), []);
-  const [projects, setProjects] = useState<Project[]>(initialState.projects);
-  const [tasks, setTasks] = useState<Task[]>(initialState.tasks);
-  const [theme, setTheme] = useState<"light" | "dark">(initialState.theme);
-  const [user, setUser] = useState<User | undefined>(initialState.user);
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [theme, setTheme] = useState(initialState.theme);
+  const [user, setUser] = useState(null);
   const [isProfileOpen, setProfileOpen] = useState(false);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef(null);
   
-  const [activeProjectId, setActiveProjectId] = useState<string | "all">("all");
-  const [view, setView] = useState<"board" | "list" | "calendar" | "insights">("board");
+  const [activeProjectId, setActiveProjectId] = useState("all");
+  const [view, setView] = useState("board");
   
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeTask, setActiveTask] = useState(null);
   const [query, setQuery] = useState("");
-  const [priority, setPriority] = useState<Priority | "All">("All");
+  const [priority, setPriority] = useState("All");
   const [label, setLabel] = useState("All");
   
   const [isModalOpen, setModalOpen] = useState(false);
   const [isNewColumnModalOpen, setNewColumnModalOpen] = useState(false);
   const [isNewProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [isEditProjectModalOpen, setEditProjectModalOpen] = useState(false);
-  const [editingColumn, setEditingColumn] = useState<Column | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingColumn, setEditingColumn] = useState(null);
+  const [toast, setToast] = useState(null);
+  const fileInputRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -67,22 +60,44 @@ export default function App() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // Authenticate user on mount
+  useEffect(() => {
+    const token = api.getToken();
+    if (token) {
+      api.getMe()
+        .then((profile) => {
+          setUser(profile);
+          return api.getBoardState();
+        })
+        .then((state) => {
+          if (state) {
+            setProjects(state.projects);
+            setTasks(state.tasks);
+          }
+        })
+        .catch(() => {
+          api.logout();
+          setUser(null);
+        });
+    }
+  }, []);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    saveBoardState({ projects, tasks, theme, user });
-  }, [projects, tasks, theme, user]);
+    saveBoardState({ theme, user });
+  }, [theme, user]);
 
   useEffect(() => {
     if (!toast) {
       return;
     }
-
     const timer = window.setTimeout(() => setToast(null), 2400);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+    function handleClickOutside(event) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
         setProfileOpen(false);
       }
     }
@@ -93,9 +108,10 @@ export default function App() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isProfileOpen]);
+
   // Unique labels list across all tasks
   const labels = useMemo(
-    () => Array.from(new Set(tasks.flatMap((task) => task.labels.map((item) => item.name)))).sort(),
+    () => Array.from(new Set(tasks.flatMap((task) => task.labels ? task.labels.map((item) => item.name) : []))).sort(),
     [tasks],
   );
 
@@ -108,12 +124,12 @@ export default function App() {
       
       const matchesQuery =
         !normalized ||
-        [task.title, task.description, task.priority, ...task.labels.map((item) => item.name), ...task.assignees.map((person) => person.name)]
+        [task.title, task.description, task.priority, ...(task.labels ? task.labels.map((item) => item.name) : []), ...(task.assignees ? task.assignees.map((person) => person.name) : [])]
           .join(" ")
           .toLowerCase()
           .includes(normalized);
       const matchesPriority = priority === "All" || task.priority === priority;
-      const matchesLabel = label === "All" || task.labels.some((item) => item.name === label);
+      const matchesLabel = label === "All" || (task.labels && task.labels.some((item) => item.name === label));
 
       return matchesProject && matchesQuery && matchesPriority && matchesLabel;
     });
@@ -125,29 +141,29 @@ export default function App() {
   const completedCount = useMemo(() => {
     return filteredTasks.filter((task) => {
       const proj = projects.find((p) => p.id === task.projectId);
-      if (!proj || !proj.columns.length) return false;
+      if (!proj || !proj.columns || !proj.columns.length) return false;
       const lastColId = proj.columns[proj.columns.length - 1].id;
       return task.status === lastColId;
     }).length;
   }, [filteredTasks, projects]);
 
-  function notify(message: string, kind: ToastKind = "success") {
+  function notify(message, kind = "success") {
     setToast({ message, kind });
   }
 
-  function getTask(id: string) {
+  function getTask(id) {
     return tasks.find((task) => task.id === id);
   }
 
   // Find target project/column from drag target
-  function getTargetColumnOrProject(overId: string): string | null {
+  function getTargetColumnOrProject(overId) {
     if (projects.some((p) => p.id === overId)) {
       return overId;
     }
     
     if (activeProjectId !== "all") {
       const currentProj = projects.find((p) => p.id === activeProjectId);
-      if (currentProj?.columns.some((c) => c.id === overId)) {
+      if (currentProj?.columns?.some((c) => c.id === overId)) {
         return overId;
       }
     }
@@ -159,11 +175,11 @@ export default function App() {
     return null;
   }
 
-  function handleDragStart(event: DragStartEvent) {
+  function handleDragStart(event) {
     setActiveTask(getTask(String(event.active.id)) ?? null);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(event) {
     const { active, over } = event;
     setActiveTask(null);
 
@@ -181,209 +197,232 @@ export default function App() {
     }
 
     if (activeProjectId === "all") {
-      // Moving task between projects
-      setTasks((currentTasks) => {
-        return currentTasks.map((t) => {
-          if (t.id === activeId) {
-            const targetProj = projects.find((p) => p.id === target);
-            const targetStatus = targetProj?.columns[0]?.id || "todo";
-            return { ...t, projectId: target, status: targetStatus };
-          }
-          return t;
-        });
-      });
-      notify(`Moved task to ${projects.find((p) => p.id === target)?.name}`);
+      const targetProj = projects.find((p) => p.id === target);
+      const targetStatus = targetProj?.columns?.[0]?.id || "todo";
+      const updatedTask = { ...activeItem, projectId: target, status: targetStatus };
+
+      setTasks((currentTasks) => currentTasks.map((t) => (t.id === activeId ? updatedTask : t)));
+      api.updateTask(updatedTask).catch(() => notify("Failed to sync drag update", "error"));
+      notify(`Moved task to ${targetProj?.name}`);
     } else {
-      // Moving task between phases of the same project
-      setTasks((currentTasks) => {
-        const activeIndex = currentTasks.findIndex((t) => t.id === activeId);
-        const overIndex = currentTasks.findIndex((t) => t.id === overId);
+      const activeIndex = tasks.findIndex((t) => t.id === activeId);
+      const overIndex = tasks.findIndex((t) => t.id === overId);
 
-        const nextTasks = [...currentTasks];
-        nextTasks[activeIndex] = { ...nextTasks[activeIndex], status: target };
+      const nextTasks = [...tasks];
+      nextTasks[activeIndex] = { ...nextTasks[activeIndex], status: target };
 
-        if (overIndex === -1) {
-          const [movingTask] = nextTasks.splice(activeIndex, 1);
-          const lastIndexInColumn = findLastIndex(nextTasks, (t) => t.status === target && t.projectId === activeProjectId);
-          nextTasks.splice(lastIndexInColumn + 1, 0, movingTask);
-          return nextTasks;
-        }
+      let finalTasks;
+      if (overIndex === -1) {
+        const [movingTask] = nextTasks.splice(activeIndex, 1);
+        const lastIndexInColumn = findLastIndex(nextTasks, (t) => t.status === target && t.projectId === activeProjectId);
+        nextTasks.splice(lastIndexInColumn + 1, 0, movingTask);
+        finalTasks = nextTasks;
+      } else {
+        finalTasks = arrayMove(nextTasks, activeIndex, overIndex);
+      }
 
-        return arrayMove(nextTasks, activeIndex, overIndex);
-      });
+      setTasks(finalTasks);
+      const updatedTask = finalTasks.find((t) => t.id === activeId);
+      if (updatedTask) {
+        api.updateTask(updatedTask).catch(() => notify("Failed to sync drag update", "error"));
+      }
 
       if (activeItem.status !== target) {
         const currentProj = projects.find((p) => p.id === activeProjectId);
-        notify(`Moved to ${currentProj?.columns.find((c) => c.id === target)?.title}`);
+        notify(`Moved to ${currentProj?.columns?.find((c) => c.id === target)?.title}`);
       }
     }
   }
 
-  function handleStatusChange(taskId: string, newStatus: ColumnId) {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)),
-    );
-    // Find column title for toast
-    const proj = projects.find((p) => p.columns.some((c) => c.id === newStatus));
-    const title = proj?.columns.find((c) => c.id === newStatus)?.title || newStatus;
-    notify(`Moved to ${title}`);
+  function handleStatusChange(taskId, newStatus) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      const updatedTask = { ...task, status: newStatus };
+      setTasks((currentTasks) =>
+        currentTasks.map((t) => (t.id === taskId ? updatedTask : t)),
+      );
+      api.updateTask(updatedTask).catch(() => notify("Failed to update status", "error"));
+      
+      const proj = projects.find((p) => p.columns && p.columns.some((c) => c.id === newStatus));
+      const title = proj?.columns?.find((c) => c.id === newStatus)?.title || newStatus;
+      notify(`Moved to ${title}`);
+    }
   }
 
-  function handleDelete(taskId: string) {
+  function handleDelete(taskId) {
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+    api.deleteTask(taskId).catch(() => notify("Failed to delete task", "error"));
     notify("Task deleted", "info");
   }
 
-  function handleCreate(task: Task) {
-    setTasks((currentTasks) => [task, ...currentTasks]);
+  function handleCreate(task) {
+    api.createTask(task)
+      .then((createdTask) => {
+        setTasks((currentTasks) => [createdTask, ...currentTasks]);
+        notify("Task created");
+      })
+      .catch((err) => notify(err.message || "Failed to create task", "error"));
     setModalOpen(false);
-    notify("Task created");
   }
 
-  function handleAddColumn(column: Column) {
-    setProjects((currentProjects) => {
-      return currentProjects.map((proj) => {
-        if (proj.id === activeProjectId) {
-          return {
-            ...proj,
-            columns: [...proj.columns, column],
-          };
-        }
-        return proj;
-      });
-    });
+  function handleAddColumn(column) {
+    api.addColumn(activeProjectId, column)
+      .then((newCol) => {
+        setProjects((currentProjects) => {
+          return currentProjects.map((proj) => {
+            if (proj.id === activeProjectId) {
+              return {
+                ...proj,
+                columns: [...(proj.columns || []), newCol],
+              };
+            }
+            return proj;
+          });
+        });
+        notify(`Created list "${column.title}"`);
+      })
+      .catch((err) => notify(err.message || "Failed to create list", "error"));
     setNewColumnModalOpen(false);
-    notify(`Created list "${column.title}"`);
   }
 
-  function handleCreateProject(project: Project) {
-    setProjects((currentProjects) => [...currentProjects, project]);
+  function handleCreateProject(project) {
+    api.createProject(project)
+      .then((newProj) => {
+        setProjects((currentProjects) => [...currentProjects, newProj]);
+        setActiveProjectId(newProj.id);
+        notify(`Created project "${newProj.name}"`);
+      })
+      .catch((err) => notify(err.message || "Failed to create project", "error"));
     setNewProjectModalOpen(false);
-    setActiveProjectId(project.id);
-    notify(`Created project "${project.name}"`);
   }
 
-  function handleUpdateProject(id: string, updates: { name: string; description: string }) {
-    setProjects((currentProjects) => {
-      return currentProjects.map((p) => (p.id === id ? { ...p, ...updates } : p));
-    });
+  function handleUpdateProject(id, updates) {
+    api.updateProject(id, updates.name, updates.description)
+      .then(() => {
+        setProjects((currentProjects) => {
+          return currentProjects.map((p) => (p.id === id ? { ...p, ...updates } : p));
+        });
+        notify(`Project settings updated`);
+      })
+      .catch((err) => notify(err.message || "Failed to update project", "error"));
     setEditProjectModalOpen(false);
-    notify(`Project settings updated`);
   }
 
-  function handleDeleteProject(id: string) {
-    setProjects((currentProjects) => currentProjects.filter((p) => p.id !== id));
-    setTasks((currentTasks) => currentTasks.filter((t) => t.projectId !== id));
+  function handleDeleteProject(id) {
+    api.deleteProject(id)
+      .then(() => {
+        setProjects((currentProjects) => currentProjects.filter((p) => p.id !== id));
+        setTasks((currentTasks) => currentTasks.filter((t) => t.projectId !== id));
+        setActiveProjectId("all");
+        notify(`Project deleted`, "info");
+      })
+      .catch((err) => notify(err.message || "Failed to delete project", "error"));
     setEditProjectModalOpen(false);
-    setActiveProjectId("all");
-    notify(`Project deleted`, "info");
   }
 
-  function handleUpdateColumn(columnId: string, updates: { title: string; accent: string }) {
-    setProjects((currentProjects) => {
-      return currentProjects.map((proj) => {
-        if (proj.id === activeProjectId) {
-          return {
-            ...proj,
-            columns: proj.columns.map((c) => (c.id === columnId ? { ...c, ...updates } : c)),
-          };
-        }
-        return proj;
-      });
-    });
+  function handleUpdateColumn(columnId, updates) {
+    api.updateColumn(activeProjectId, columnId, updates.title, updates.accent)
+      .then((updatedCol) => {
+        setProjects((currentProjects) => {
+          return currentProjects.map((proj) => {
+            if (proj.id === activeProjectId) {
+              return {
+                ...proj,
+                columns: proj.columns.map((c) => (c.id === columnId ? updatedCol : c)),
+              };
+            }
+            return proj;
+          });
+        });
+        notify(`List updated`);
+      })
+      .catch((err) => notify(err.message || "Failed to update list", "error"));
     setEditingColumn(null);
-    notify(`List updated`);
   }
 
-  function handleDeleteColumn(columnId: string) {
-    setProjects((currentProjects) => {
-      return currentProjects.map((proj) => {
-        if (proj.id === activeProjectId) {
-          return {
-            ...proj,
-            columns: proj.columns.filter((c) => c.id !== columnId),
-          };
-        }
-        return proj;
-      });
-    });
-
-    // Move any tasks that belonged to this column to the FIRST column in the project
-    const activeProject = projects.find((p) => p.id === activeProjectId);
-    const remainingColumns = activeProject?.columns.filter((c) => c.id !== columnId) || [];
-    const fallbackColumnId = remainingColumns[0]?.id || "todo";
-
-    setTasks((currentTasks) => {
-      return currentTasks.map((t) => {
-        if (t.projectId === activeProjectId && t.status === columnId) {
-          return { ...t, status: fallbackColumnId };
-        }
-        return t;
-      });
-    });
-
+  function handleDeleteColumn(columnId) {
+    api.deleteColumn(activeProjectId, columnId)
+      .then((res) => {
+        setProjects((currentProjects) => {
+          return currentProjects.map((proj) => {
+            if (proj.id === activeProjectId) {
+              return {
+                ...proj,
+                columns: proj.columns.filter((c) => c.id !== columnId),
+              };
+            }
+            return proj;
+          });
+        });
+        const fallbackColumnId = res.fallback_column_id || "todo";
+        setTasks((currentTasks) => {
+          return currentTasks.map((t) => {
+            if (t.projectId === activeProjectId && t.status === columnId) {
+              return { ...t, status: fallbackColumnId };
+            }
+            return t;
+          });
+        });
+        notify(`List deleted`, "info");
+      })
+      .catch((err) => notify(err.message || "Failed to delete list", "error"));
     setEditingColumn(null);
-    notify(`List deleted`, "info");
   }
 
-  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImport(event) {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     try {
       const imported = await readImportFile(file);
-      // Merge imported projects if any exist
-      if (imported.projects && imported.projects.length) {
-        setProjects(imported.projects);
-      }
-      setTasks(imported.tasks);
-      setTheme(imported.theme);
+      await api.importBoard(imported);
+      const state = await api.getBoardState();
+      setProjects(state.projects);
+      setTasks(state.tasks);
       notify("Data imported");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Could not import file", "error");
+      notify(error.message || "Could not import file", "error");
     } finally {
       event.target.value = "";
     }
   }
 
   function handleClear() {
-    resetBoardState();
-    if (activeProjectId === "all") {
-      setTasks([]);
-      setProjects([
-        {
-          id: "project-1",
-          name: "Default Project",
-          description: "My first project",
-          columns: [
-            { id: "todo", title: "To Do", accent: "#64748b" },
-            { id: "progress", title: "In Progress", accent: "#2563eb" },
-            { id: "done", title: "Done", accent: "#059669" },
-          ],
-        },
-      ]);
-      setActiveProjectId("project-1");
-      notify("All projects and tasks deleted", "info");
-    } else {
-      setTasks((currentTasks) => currentTasks.filter((t) => t.projectId !== activeProjectId));
-      notify("Cleared all tasks in active project", "info");
-    }
-    setQuery("");
-    setPriority("All");
-    setLabel("All");
+    api.clearBoard()
+      .then(() => {
+        setTasks([]);
+        if (activeProjectId === "all") {
+          setProjects([
+            {
+              id: "project-1",
+              name: "Default Project",
+              description: "My first project",
+              columns: [
+                { id: "todo", title: "To Do", accent: "#64748b" },
+                { id: "progress", title: "In Progress", accent: "#2563eb" },
+                { id: "done", title: "Done", accent: "#059669" },
+              ],
+            },
+          ]);
+          setActiveProjectId("project-1");
+          notify("All projects and tasks deleted", "info");
+        } else {
+          notify("Cleared all tasks in active project", "info");
+        }
+        setQuery("");
+        setPriority("All");
+        setLabel("All");
+      })
+      .catch(() => notify("Failed to clear board", "error"));
   }
 
-  // Columns to show on Board View:
-  // If "all", each column is a Project.
-  // If specific project, each column is a custom Column/Phase.
+  // Columns to show on Board View
   const boardColumnsToShow = useMemo(() => {
     if (activeProjectId === "all") {
       return projects.map((p) => ({
         id: p.id,
         title: p.name,
-        accent: "#3b82f6", // Default Blue accent for projects
+        accent: "#3b82f6",
       }));
     } else {
       const activeProj = projects.find((p) => p.id === activeProjectId);
@@ -395,9 +434,16 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <AuthScreen
-          onLogin={(loggedInUser) => {
+          onLogin={async (loggedInUser) => {
             setUser(loggedInUser);
-            notify(`Logged in as ${loggedInUser.name}`);
+            try {
+              const state = await api.getBoardState();
+              setProjects(state.projects);
+              setTasks(state.tasks);
+              notify(`Logged in as ${loggedInUser.name}`);
+            } catch (err) {
+              notify("Could not load board data", "error");
+            }
           }}
         />
         {toast && <Toast message={toast.message} kind={toast.kind} />}
@@ -530,7 +576,8 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setUser(undefined);
+                        api.logout();
+                        setUser(null);
                         setProfileOpen(false);
                         notify("Logged out", "info");
                       }}
@@ -582,8 +629,6 @@ export default function App() {
           >
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
               {boardColumnsToShow.map((column) => {
-                // If global "all" is active, filter tasks by projectId.
-                // If project is selected, filter tasks by status.
                 const columnTasks = activeProjectId === "all"
                   ? filteredTasks.filter((task) => task.projectId === column.id)
                   : filteredTasks.filter((task) => task.status === column.id);
@@ -600,7 +645,6 @@ export default function App() {
                 );
               })}
               
-              {/* "Add List" Card - only shown in project-specific view */}
               {activeProjectId !== "all" && (
                 <button
                   type="button"
@@ -678,7 +722,7 @@ export default function App() {
 
       {isEditProjectModalOpen && activeProjectId !== "all" && (
         <EditProjectModal
-          project={projects.find((p) => p.id === activeProjectId)!}
+          project={projects.find((p) => p.id === activeProjectId)}
           onClose={() => setEditProjectModalOpen(false)}
           onUpdate={handleUpdateProject}
           onDelete={handleDeleteProject}
@@ -701,12 +745,11 @@ export default function App() {
   );
 }
 
-function findLastIndex<T>(items: T[], predicate: (item: T) => boolean) {
+function findLastIndex(items, predicate) {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     if (predicate(items[index])) {
       return index;
     }
   }
-
   return -1;
 }

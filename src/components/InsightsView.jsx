@@ -1,17 +1,10 @@
-import { Task, Project } from "../types";
 import { AlertCircle, CheckCircle2, ListTodo, Percent } from "lucide-react";
 
-type InsightsViewProps = {
-  tasks: Task[];
-  projects: Project[];
-  activeProjectId: string | "all";
-};
-
-export function InsightsView({ tasks, projects, activeProjectId }: InsightsViewProps) {
+export function InsightsView({ tasks, projects, activeProjectId }) {
   // 1. Completion detection helpers
-  function isTaskCompleted(task: Task): boolean {
+  function isTaskCompleted(task) {
     const project = projects.find((p) => p.id === task.projectId);
-    if (!project || !project.columns.length) {
+    if (!project || !project.columns || !project.columns.length) {
       return false;
     }
     const lastColId = project.columns[project.columns.length - 1].id;
@@ -32,24 +25,20 @@ export function InsightsView({ tasks, projects, activeProjectId }: InsightsViewP
   ).length;
 
   // 4. Status breakdown logic
-  // If activeProjectId is specific, show columns of that project.
-  // If "all", show overall statuses (todo/ideas, progress/dev, review/qa, done/complete).
-  const statusCounts: { title: string; count: number; accent: string }[] = [];
+  const statusCounts = [];
   if (activeProjectId !== "all") {
     const activeProject = projects.find((p) => p.id === activeProjectId);
-    if (activeProject) {
+    if (activeProject && activeProject.columns) {
       activeProject.columns.forEach((col) => {
         const count = tasks.filter((t) => t.status === col.id).length;
         statusCounts.push({ title: col.title, count, accent: col.accent });
       });
     }
   } else {
-    // Group status across all projects
-    // To make it simple, we group by status title (since columns have titles like 'To Do', 'Ideas', 'Done', etc.)
-    const statusMap: Record<string, { count: number; accent: string }> = {};
+    const statusMap = {};
     tasks.forEach((task) => {
       const proj = projects.find((p) => p.id === task.projectId);
-      const col = proj?.columns.find((c) => c.id === task.status);
+      const col = proj?.columns?.find((c) => c.id === task.status);
       if (col) {
         if (!statusMap[col.title]) {
           statusMap[col.title] = { count: 0, accent: col.accent };
@@ -70,23 +59,25 @@ export function InsightsView({ tasks, projects, activeProjectId }: InsightsViewP
   };
 
   // 6. Label density
-  const labelMap: Record<string, { count: number; color: string }> = {};
+  const labelMap = {};
   tasks.forEach((t) => {
-    t.labels.forEach((l) => {
-      if (!labelMap[l.name]) {
-        labelMap[l.name] = { count: 0, color: l.color };
-      }
-      labelMap[l.name].count++;
-    });
+    if (t.labels) {
+      t.labels.forEach((l) => {
+        if (!labelMap[l.name]) {
+          labelMap[l.name] = { count: 0, color: l.color };
+        }
+        labelMap[l.name].count++;
+      });
+    }
   });
   const labelStats = Object.entries(labelMap)
     .map(([name, val]) => ({ name, count: val.count, color: val.color }))
     .sort((a, b) => b.count - a.count);
 
   // 7. Assignee workload (incomplete tasks assigned)
-  const assigneeMap: Record<string, { count: number; avatar: string; color: string }> = {};
+  const assigneeMap = {};
   tasks.forEach((t) => {
-    if (!isTaskCompleted(t)) {
+    if (!isTaskCompleted(t) && t.assignees) {
       t.assignees.forEach((a) => {
         if (!assigneeMap[a.name]) {
           assigneeMap[a.name] = { count: 0, avatar: a.avatar, color: a.color };
@@ -212,8 +203,8 @@ export function InsightsView({ tasks, projects, activeProjectId }: InsightsViewP
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/40">
           <h3 className="text-sm font-bold text-slate-950 dark:text-white mb-4">Priority Breakdown</h3>
           <div className="flex flex-col gap-3">
-            {(["High", "Medium", "Low"] as const).map((pri) => {
-              const count = priorityCounts[pri];
+            {["High", "Medium", "Low"].map((pri) => {
+              const count = priorityCounts[pri] || 0;
               const pct = totalTasks > 0 ? (count / totalTasks) * 100 : 0;
               const barColors = {
                 High: "bg-rose-500",
@@ -245,7 +236,6 @@ export function InsightsView({ tasks, projects, activeProjectId }: InsightsViewP
           <h3 className="text-sm font-bold text-slate-950 dark:text-white mb-4">Assignee Workload (Active Tasks)</h3>
           <div className="flex flex-col gap-3">
             {assigneeStats.map((ast) => {
-              // Find max active count to scale meters
               const maxActive = Math.max(...assigneeStats.map((s) => s.count), 1);
               const scalePct = (ast.count / maxActive) * 100;
               return (

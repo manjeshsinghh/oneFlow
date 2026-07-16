@@ -1,6 +1,4 @@
-import { Project, Task } from "../types";
-
-export const sampleProjects: Project[] = [
+export const sampleProjects = [
   {
     id: "project-1",
     name: "Platform Engineering",
@@ -25,7 +23,7 @@ export const sampleProjects: Project[] = [
   },
 ];
 
-export const sampleTasks: Task[] = [
+export const sampleTasks = [
   {
     id: "task-1",
     projectId: "project-2",

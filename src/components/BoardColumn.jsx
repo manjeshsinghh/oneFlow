@@ -1,17 +1,9 @@
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { Edit2 } from "lucide-react";
-import { Column, Task } from "../types";
 import { TaskCard } from "./TaskCard";
 
-type BoardColumnProps = {
-  column: Column;
-  tasks: Task[];
-  onDelete?: (id: string) => void;
-  onEdit?: (column: Column) => void;
-};
-
-export function BoardColumn({ column, tasks, onDelete, onEdit }: BoardColumnProps) {
+export function BoardColumn({ column, tasks, onDelete, onEdit }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: "column", column } });
 
   return (

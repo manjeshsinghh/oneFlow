@@ -1,4 +1,4 @@
-# Architecture Walkthrough (ARCHITECTURE.md)
+# Architecture Walkthrough
 
 This document describes the high-level architecture, state flow, and component design of TaskFlow.
 
@@ -6,56 +6,52 @@ This document describes the high-level architecture, state flow, and component d
 
 ## 🗺️ Architectural Overview
 
-TaskFlow is a self-contained, client-side React SPA. It does not have a backend API or server database. The state is synchronized synchronously to `localStorage` on every change.
+TaskFlow is structured as a full-stack web application consisting of a **FastAPI (Python)** backend serving a SQLite database, and a **React (JavaScript)** single-page application frontend.
 
 ```mermaid
 graph TD
-    A[Browser Entry: index.html] --> B[App Mount: main.tsx]
-    B --> C[Workspace Coordinator: App.tsx]
-    C --> D[Local Storage: storage.ts]
-    C --> E[User Authentication Guard: AuthScreen.tsx]
-    C --> F[Toolbar Filters: Toolbar.tsx]
-    C --> G[Workplace Views]
-    G --> H[Board View: BoardColumn.tsx & TaskCard.tsx]
-    G --> I[List View: TaskListView.tsx]
-    G --> J[Calendar View: CalendarView.tsx]
-    G --> K[Insights View: InsightsView.tsx]
-    C --> L[Workspace Operations: Modals]
-    L --> M[New/Edit Project Modals]
-    L --> N[New/Edit Column Modals]
-    L --> O[New Task Modal]
+    A[Browser Entry: index.html] --> B[App Mount: main.jsx]
+    B --> C[Workspace Coordinator: App.jsx]
+    C --> D[Vite Proxy /api]
+    D --> E[FastAPI: main.py]
+    E --> F[Auth Guard: auth.py]
+    E --> G[SQLite DB: taskflow.db via database.py]
+    C --> H[Local Preference Cache: storage.js]
+    C --> I[Workplace Views]
+    I --> J[Board View]
+    I --> K[List View]
+    I --> L[Calendar View]
+    I --> M[Insights View]
 ```
 
 ---
 
-## 💾 State Management & Data Pipeline
+## 💾 Data Flow & State Management
 
-The state is orchestrated in `App.tsx` using the following core hooks:
-1. `projects`: List of `Project` objects. Each project contains an array of `Column` structures (phases).
-2. `tasks`: List of `Task` objects. Each task contains attributes like `projectId`, `status` (referencing a column's `id`), `assignees`, `priority`, and `dueDate`.
-3. `user`: The currently logged-in user profile (`email`, `name`, `avatar`, `color`).
-4. `theme`: Represents the active layout color style (`"light" | "dark"`).
-
-### Local Storage Serialization
-- **Mount Phase**: App executes `loadBoardState()` in `src/utils/storage.ts` to restore projects, tasks, user sessions, and themes from `localStorage` under the key `modern-kanban-board-v2`. If empty, it initializes the app with sample data from `src/data/sampleTasks.ts`.
-- **Sync Phase**: On any change in `projects`, `tasks`, `theme`, or `user`, a `useEffect` triggers `saveBoardState()`, serializing state back into `localStorage`.
+The core state of the application is maintained in `App.jsx`:
+1.  **Mount phase**: The frontend checks for an active JWT token in `localStorage`. If found, it requests the current user profile `/api/auth/me` and the active workspace state `/api/board` containing all projects, columns, and tasks.
+2.  **User Actions**:
+    *   Creating/updating/deleting tasks, projects, or columns triggers an API request to the backend.
+    *   State is updated optimistically on the client to ensure zero lag, while asynchronous backend synchronization keeps the SQLite database up to date.
+3.  **Local storage cache**: Local storage is only used to store the user authentication token and local preferences like the UI theme (`light` or `dark`).
 
 ---
 
-## 🔀 Drag-and-Drop Implementation
+## 🗃️ Backend Runtimes
 
-Drag-and-drop operations are implemented in `App.tsx` using `@dnd-kit/core`:
-- **Sensors**: Instantiates `PointerSensor` (with a `6px` move threshold to prevent accidental clicks), `TouchSensor` (with a `120ms` delay to allow natural scrolling on mobile), and `KeyboardSensor`.
-- **Reordering**: Uses `arrayMove` to shift elements.
-- **Project Reassignment (Global Board)**: Dragging cards between project columns updates the task's `projectId` and resets its status to the new project's first column.
-- **Workflow Reassignment (Project Board)**: Dragging cards updates the task's `status` (referencing custom columns).
+*   **FastAPI**: Exposes CORS-friendly REST endpoints for auth, projects, columns, and tasks.
+*   **SQLAlchemy ORM**: Connects to a local SQLite database file (`taskflow.db`) and defines relational tables for:
+    *   `User`: Registered credentials and color profiles.
+    *   `Project`: Scope containers representing independent workspaces.
+    *   `ProjectColumn`: Ordered phase tracks belonging to projects.
+    *   `Task`: Individual task cards belonging to projects and columns, containing JSON arrays for assignees and labels.
 
 ---
 
 ## 🔑 Authentication Flow
 
-Access to TaskFlow is managed via an authentication guard in `App.tsx`:
-1. Check if `user` state exists on startup. If not, mount `<AuthScreen />`.
-2. `<AuthScreen />` handles signup and sign-in modes. Registered credentials are stored in `taskflow-registered-users`.
-3. Passwords are protected using a native SHA-256 Web Crypto hash.
-4. On success, `onLogin` triggers `setUser(user)` which updates state, re-renders `App.tsx`, and loads the dashboard.
+Access to the board views is guarded by user session status:
+1.  If no JWT token is stored, the app mounts the `<AuthScreen />`.
+2.  `<AuthScreen />` submits credentials (email and password hashed with SHA-256 client-side) to `/api/auth/login`.
+3.  On success, the backend returns a JWT token, which the frontend stores in `localStorage` as `taskflow-token` and injects into the `Authorization: Bearer <token>` header of all subsequent API requests.
+4.  Default projects and tasks are seeded automatically for newly registered users on the server side.

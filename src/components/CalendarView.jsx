@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
-import { Task, Project } from "../types";
 
-type CalendarViewProps = {
-  tasks: Task[];
-  projects: Project[];
-};
-
-export function CalendarView({ tasks, projects }: CalendarViewProps) {
+export function CalendarView({ tasks, projects }) {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const year = currentDate.getFullYear();
@@ -21,7 +15,7 @@ export function CalendarView({ tasks, projects }: CalendarViewProps) {
   const prevMonthEnd = new Date(year, month, 0).getDate();
 
   // Generate calendar days grid (including padding from previous/next months)
-  const calendarCells: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
+  const calendarCells = [];
 
   // Previous month padding days
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
@@ -65,14 +59,14 @@ export function CalendarView({ tasks, projects }: CalendarViewProps) {
   ];
 
   // Helper to find task status accent color
-  function getTaskStatusAccent(task: Task): string {
+  function getTaskStatusAccent(task) {
     const project = projects.find((p) => p.id === task.projectId);
-    const column = project?.columns.find((c) => c.id === task.status);
+    const column = project?.columns?.find((c) => c.id === task.status);
     return column?.accent || "#64748b";
   }
 
   // Helper to find task project name
-  function getTaskProjectName(task: Task): string {
+  function getTaskProjectName(task) {
     const project = projects.find((p) => p.id === task.projectId);
     return project?.name || "Unknown Project";
   }
@@ -169,7 +163,7 @@ export function CalendarView({ tasks, projects }: CalendarViewProps) {
                       />
                       <span className="truncate flex-1">{task.title}</span>
 
-                      {/* Premium Hover Card details overlay */}
+                      {/* Hover Card details overlay */}
                       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 scale-95 opacity-0 rounded-lg border border-slate-200 bg-white p-3 shadow-lg transition-all group-hover/item:scale-100 group-hover/item:opacity-100 dark:border-slate-800 dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-300">
                         <div className="flex items-center gap-1.5 font-bold text-slate-950 dark:text-white">
                           <span

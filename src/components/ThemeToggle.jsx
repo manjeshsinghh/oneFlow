@@ -1,11 +1,6 @@
 import { Moon, Sun } from "lucide-react";
 
-type ThemeToggleProps = {
-  theme: "light" | "dark";
-  onToggle: () => void;
-};
-
-export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
+export function ThemeToggle({ theme, onToggle }) {
   const isDark = theme === "dark";
 
   return (

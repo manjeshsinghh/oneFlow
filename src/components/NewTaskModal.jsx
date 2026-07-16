@@ -1,16 +1,7 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
-import { Priority, Task, Project, User } from "../types";
 
-type NewTaskModalProps = {
-  onClose: () => void;
-  onCreate: (task: Task) => void;
-  projects: Project[];
-  activeProjectId: string | "all";
-  currentUser?: User;
-};
-
-export function NewTaskModal({ onClose, onCreate, projects, activeProjectId, currentUser }: NewTaskModalProps) {
+export function NewTaskModal({ onClose, onCreate, projects, activeProjectId, currentUser }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   
@@ -23,19 +14,19 @@ export function NewTaskModal({ onClose, onCreate, projects, activeProjectId, cur
   const projectColumns = selectedProject?.columns || [];
 
   const [status, setStatus] = useState(projectColumns[0]?.id || "todo");
-  const [priority, setPriority] = useState<Priority>("Medium");
+  const [priority, setPriority] = useState("Medium");
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [labels, setLabels] = useState("Product");
 
-  function handleProjectChange(newProjId: string) {
+  function handleProjectChange(newProjId) {
     setProjectId(newProjId);
     const proj = projects.find((p) => p.id === newProjId);
-    if (proj && proj.columns.length) {
+    if (proj && proj.columns && proj.columns.length) {
       setStatus(proj.columns[0].id);
     }
   }
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event) {
     event.preventDefault();
     if (!title.trim() || !description.trim() || !projectId) {
       return;
@@ -110,7 +101,7 @@ export function NewTaskModal({ onClose, onCreate, projects, activeProjectId, cur
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="field-label">
               Priority
-              <select className="field-input" value={priority} onChange={(event) => setPriority(event.target.value as Priority)}>
+              <select className="field-input" value={priority} onChange={(event) => setPriority(event.target.value)}>
                 <option>High</option>
                 <option>Medium</option>
                 <option>Low</option>

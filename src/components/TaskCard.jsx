@@ -1,13 +1,6 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { CalendarDays, GripVertical, MessageSquare, Trash2 } from "lucide-react";
-import { Task } from "../types";
-
-type TaskCardProps = {
-  task: Task;
-  overlay?: boolean;
-  onDelete?: (id: string) => void;
-};
 
 const priorityClasses = {
   High: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30",
@@ -15,7 +8,7 @@ const priorityClasses = {
   Low: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
 };
 
-export function TaskCard({ task, overlay = false, onDelete }: TaskCardProps) {
+export function TaskCard({ task, overlay = false, onDelete }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: "task", task },
@@ -66,7 +59,7 @@ export function TaskCard({ task, overlay = false, onDelete }: TaskCardProps) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {task.labels.map((label) => (
+        {task.labels && task.labels.map((label) => (
           <span
             key={`${task.id}-${label.name}`}
             className="rounded-md px-2 py-1 text-xs font-medium text-slate-950 dark:text-white"
@@ -79,7 +72,7 @@ export function TaskCard({ task, overlay = false, onDelete }: TaskCardProps) {
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex -space-x-2">
-          {task.assignees.map((assignee) => (
+          {task.assignees && task.assignees.map((assignee) => (
             <span
               key={`${task.id}-${assignee.name}`}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white dark:border-slate-900"
@@ -90,7 +83,7 @@ export function TaskCard({ task, overlay = false, onDelete }: TaskCardProps) {
             </span>
           ))}
         </div>
-        <span className={`rounded-full px-2 py-1 text-xs font-semibold ring-1 ${priorityClasses[task.priority]}`}>
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ring-1 ${priorityClasses[task.priority] || ""}`}>
           {task.priority}
         </span>
       </div>
@@ -109,6 +102,11 @@ export function TaskCard({ task, overlay = false, onDelete }: TaskCardProps) {
   );
 }
 
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${date}T00:00:00`));
+function formatDate(date) {
+  if (!date) return "";
+  try {
+    return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${date}T00:00:00`));
+  } catch {
+    return date;
+  }
 }

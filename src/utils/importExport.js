@@ -1,8 +1,6 @@
-import { BoardState, Priority, Task, Project } from "../types";
+const priorities = ["High", "Medium", "Low"];
 
-const priorities: Priority[] = ["High", "Medium", "Low"];
-
-export function downloadFile(filename: string, content: string, type: string) {
+export function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -12,7 +10,7 @@ export function downloadFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-export function exportJson(tasks: Task[], theme: BoardState["theme"]) {
+export function exportJson(tasks, theme) {
   downloadFile(
     "tasks.json",
     JSON.stringify({ tasks, theme }, null, 2),
@@ -20,7 +18,7 @@ export function exportJson(tasks: Task[], theme: BoardState["theme"]) {
   );
 }
 
-export function exportCsv(tasks: Task[]) {
+export function exportCsv(tasks) {
   const headers = [
     "id",
     "projectId",
@@ -56,35 +54,34 @@ export function exportCsv(tasks: Task[]) {
   downloadFile("tasks.csv", csv, "text/csv");
 }
 
-export async function readImportFile(file: File): Promise<BoardState> {
+export async function readImportFile(file) {
   const text = await file.text();
   if (file.name.toLowerCase().endsWith(".json")) {
     return parseJsonImport(text);
   }
 
   if (file.name.toLowerCase().endsWith(".csv")) {
-    return { projects: [], tasks: parseCsvImport(text), theme: "light" }; // projects will be merged in App.tsx
+    return { projects: [], tasks: parseCsvImport(text), theme: "light" }; // projects will be merged in App.jsx
   }
 
   throw new Error("Use a JSON or CSV file.");
 }
 
-function parseJsonImport(text: string): BoardState {
-  const parsed = JSON.parse(text) as unknown;
+function parseJsonImport(text) {
+  const parsed = JSON.parse(text);
   
-  let tasks: Task[];
-  let theme: BoardState["theme"];
-  let projects: BoardState["projects"];
+  let tasks;
+  let theme;
+  let projects;
 
   if (Array.isArray(parsed)) {
-    tasks = parsed as Task[];
+    tasks = parsed;
     theme = "light";
     projects = [];
   } else if (parsed && typeof parsed === "object") {
-    const obj = parsed as Record<string, unknown>;
-    tasks = (obj.tasks as Task[]) || [];
-    theme = obj.theme === "dark" ? "dark" : "light";
-    projects = (obj.projects as Project[]) || [];
+    tasks = parsed.tasks || [];
+    theme = parsed.theme === "dark" ? "dark" : "light";
+    projects = parsed.projects || [];
   } else {
     tasks = [];
     theme = "light";
@@ -98,7 +95,7 @@ function parseJsonImport(text: string): BoardState {
   };
 }
 
-function parseCsvImport(text: string): Task[] {
+function parseCsvImport(text) {
   const rows = parseCsv(text.trim());
   if (rows.length < 2) {
     throw new Error("CSV must include a header row and at least one task.");
@@ -126,7 +123,7 @@ function parseCsvImport(text: string): Task[] {
           })
         : [],
       dueDate: record.dueDate,
-      priority: record.priority as Priority,
+      priority: record.priority,
       labels: record.labels
         ? record.labels.split("|").map((label) => {
             const [name, color] = label.split(":");
@@ -141,7 +138,7 @@ function parseCsvImport(text: string): Task[] {
   return validateTasks(tasks);
 }
 
-function validateTasks(tasks: Task[]): Task[] {
+function validateTasks(tasks) {
   return tasks.map((task) => {
     if (!task.title || !task.description) {
       throw new Error("Each task needs a title and description.");
@@ -165,9 +162,9 @@ function validateTasks(tasks: Task[]): Task[] {
   });
 }
 
-function parseCsv(csv: string) {
-  const rows: string[][] = [];
-  let row: string[] = [];
+function parseCsv(csv) {
+  const rows = [];
+  let row = [];
   let cell = "";
   let quoted = false;
 
@@ -201,7 +198,7 @@ function parseCsv(csv: string) {
   return rows.filter((entry) => entry.some(Boolean));
 }
 
-function csvEscape(value: string) {
+function csvEscape(value) {
   let escaped = value.replace(/"/g, '""');
   if (value.startsWith("=") || value.startsWith("+") || value.startsWith("-") || value.startsWith("@") || value.startsWith("\t") || value.startsWith("\r")) {
     escaped = "'" + escaped;
@@ -209,7 +206,7 @@ function csvEscape(value: string) {
   return `"${escaped}"`;
 }
 
-function initials(name: string) {
+function initials(name) {
   return name
     .split(" ")
     .map((part) => part[0])
