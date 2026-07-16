@@ -54,7 +54,7 @@ export const api = {
   },
 
   async register(email, password, name, avatar, color) {
-    const user = await request("/api/auth/register", {
+    await request("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name, avatar, color }),
     });

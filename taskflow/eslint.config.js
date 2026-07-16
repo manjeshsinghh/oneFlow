@@ -32,6 +32,9 @@ export default [
         setInterval: "readonly",
         clearInterval: "readonly",
         navigator: "readonly",
+        URL: "readonly",
+        Blob: "readonly",
+        URLSearchParams: "readonly",
       },
     },
     plugins: {
