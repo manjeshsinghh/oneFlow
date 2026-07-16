@@ -11,6 +11,9 @@ on:
 jobs:
   backend-checks:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./taskflow
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,11 +26,11 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r taskflow/backend/requirements.txt
+          pip install -r backend/requirements.txt
 
       - name: Verify Python Compilation
         run: |
-          python -m py_compile taskflow/backend/database.py taskflow/backend/models.py taskflow/backend/schemas.py taskflow/backend/auth.py taskflow/backend/main.py
+          python -m py_compile database.py models.py schemas.py auth.py main.py
 
   frontend-checks:
     runs-on: ubuntu-latest
@@ -56,4 +59,3 @@ jobs:
 
       - name: Run Build
         run: pnpm run build
-
