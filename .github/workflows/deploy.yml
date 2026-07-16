@@ -1,0 +1,47 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    concurrency: ci-${{ github.ref }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Install Node.js ⚙️
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm 📦
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Dependencies 🔧
+        run: pnpm install --no-frozen-lockfile
+        working-directory: ./taskflow
+
+      - name: Build Project 🏗️
+        run: pnpm run build
+        working-directory: ./taskflow
+
+      - name: Stage Deployment Directory 📂
+        run: |
+          mkdir -p deploy_out
+          cp index.html deploy_out/index.html
+          cp -r taskflow/dist deploy_out/taskflow
+
+      - name: Deploy to GitHub Pages 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: deploy_out
+          branch: gh-pages
