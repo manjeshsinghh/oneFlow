@@ -26,7 +26,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
 import { exportCsv, exportJson, readImportFile } from "./utils/importExport";
-import { loadBoardState, resetBoardState, saveBoardState } from "./utils/storage";
+import { loadBoardState, saveBoardState } from "./utils/storage";
 import { api } from "./utils/api";
 
 export default function App() {
@@ -441,7 +441,7 @@ export default function App() {
               setProjects(state.projects);
               setTasks(state.tasks);
               notify(`Logged in as ${loggedInUser.name}`);
-            } catch (err) {
+            } catch {
               notify("Could not load board data", "error");
             }
           }}
