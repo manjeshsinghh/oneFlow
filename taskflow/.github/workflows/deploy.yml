@@ -35,8 +35,15 @@ jobs:
       - name: Build Project 🏗️
         run: pnpm run build
 
+      - name: Stage Deployment Directory 📂
+        run: |
+          mkdir -p ../deploy_out
+          cp ../index.html ../deploy_out/index.html
+          cp -r dist ../deploy_out/taskflow
+
       - name: Deploy to GitHub Pages 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: taskflow/dist
+          folder: deploy_out
           branch: gh-pages
+
